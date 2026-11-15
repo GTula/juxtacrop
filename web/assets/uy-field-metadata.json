@@ -1,0 +1,16 @@
+{
+  "title": "Río Negro, Uruguay illustrative field basemap and descent imagery",
+  "source": "Esri World Imagery (Esri, Maxar, Earthstar Geographics and the GIS User Community)",
+  "sourceUrl": "https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer",
+  "retrieved": "2026-11-15",
+  "centerLonLat": [-57.7056, -32.7504],
+  "projection": "EPSG:4326 (equirectangular)",
+  "layers": {
+    "uy-field.jpg": {"bbox": [-57.7226896, -32.7597424, -57.6885104, -32.7410576], "size": [2400, 1560]},
+    "uy-patch-local.jpg": {"bbox": [-57.7956, -32.8104, -57.6156, -32.6904], "size": [2048, 1365]},
+    "uy-patch-region.jpg": {"bbox": [-58.6056, -33.3704, -56.8056, -32.1304], "size": [2048, 1411]},
+    "uy-patch-country.jpg": {"bbox": [-59.6, -35.2, -52.8, -29.9], "size": [2048, 1596]}
+  },
+  "grading": "Saturation 0.88, brightness 1.06, contrast 1.04",
+  "note": "Real satellite imagery. All displayed paddock boundaries, crops, campaigns and scenario overlays are illustrative; they do not describe the actual farm."
+}
