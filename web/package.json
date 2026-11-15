@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node server.mjs --port 4173",
     "start": "node server.mjs --port 4173",
-    "test": "node tests/timeline.test.mjs && node tests/field-map.test.mjs",
+    "test": "node tests/timeline.test.mjs && node tests/field-map.test.mjs && node tests/tour.test.mjs",
     "check": "node scripts/check.mjs"
   }
 }

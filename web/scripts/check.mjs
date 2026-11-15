@@ -21,7 +21,7 @@ for(const [,value]of demo.matchAll(/\b(?:href|src)="([^"]+)"/g)){
   assert(!value.startsWith('/'),`Demo uses an absolute path, which breaks under a sub-path: ${value}`);
   await fs.access(path.join('demo',value));checked++;
 }
-for(const file of ['data.js','sources.js','engine.js','app.js']){
+for(const file of ['data.js','sources.js','engine.js','app.js','tour.js']){
   const result=spawnSync(process.execPath,['--check','demo/js/'+file],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);checked++;
   // No backend: every data source must be reachable straight from the browser.
   assert.doesNotMatch(await fs.readFile('demo/js/'+file,'utf8'),/['"`]\/api\//,`demo/js/${file} calls a local /api endpoint`);

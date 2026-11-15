@@ -21,6 +21,29 @@ python server.py
 
 Every data source is called directly from the browser (results are cached in `localStorage` per location), so there is no backend. `server.py` is only a local preview server for `web/`.
 
+## Guided demo
+
+The first visit to `/demo/` offers a guided tour in English. Choose a sample farm
+(Iowa or Uruguay), set up your own field, or dismiss the invitation. Use
+the yellow **Guided tour** button beside the logo to open it again. An interrupted tour can be
+resumed in the same page session, or restarted by choosing a route again.
+
+The guide waits for real actions: drawing a field and creating plots when
+needed, confirming history, selecting an alternative, opening its evidence,
+and changing a crop. Reading steps use **Next**. **Back**, **Close**, and Escape
+are available; leaving the guide keeps the current field. Loading a sample over
+an existing field asks before replacing it. The invitation preference is stored
+in this browser; field and tour progress are not saved across reloads.
+
+On small screens the guide scrolls the relevant controls into view and keeps
+its card below dialogs. Unknown crop history is reconstructed with the demo's
+existing simulation and remains labelled as estimated. Source failures offer a
+retry in steps that need rotation data.
+
+Run `npm test` and `npm run check` from `web/` for the controller regression tests
+and static checks. The tour controller is in `web/demo/js/tour.js` and its visual
+styles are in `web/demo/css/tour.css`.
+
 ## Publish it
 
 [juxtacrop.earth](https://juxtacrop.earth/) is deployed by Vercel on every push to `main`. `vercel.json` tells it to run the checks in `web/` and publish the `web/` folder (no install step, no framework).
