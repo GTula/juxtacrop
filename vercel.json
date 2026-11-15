@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "cd web && node tests/timeline.test.mjs && node tests/field-map.test.mjs && node scripts/check.mjs",
+  "outputDirectory": "web"
+}

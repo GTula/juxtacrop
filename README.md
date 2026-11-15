@@ -8,7 +8,7 @@ Built for the NASA Space Apps Challenge 2026 — *Field Shift: Adapting Farms wi
 
 ## Run it
 
-Requires Python 3 (no packages) and an Internet connection.
+The whole site is static and lives in `web/`. Locally it only needs Python 3 (no packages) and an Internet connection.
 
 ```bash
 python server.py
@@ -19,14 +19,20 @@ python server.py
 - `http://localhost:8000/demo/#iowa` — fictional sample farm, Story County, Iowa (corn–soybean)
 - `http://localhost:8000/demo/#uruguay` — fictional sample farm, Río Negro, Uruguay (soybean–wheat)
 
-`server.py` serves the website from `web/`, mounts the MVP at `/demo/`, and proxies the SRTM elevation API (OpenTopoData has no CORS). Every other source is called directly from the browser; results are cached in `localStorage` per location.
+Every data source is called directly from the browser (results are cached in `localStorage` per location), so there is no backend. `server.py` is only a local preview server for `web/`.
+
+## Publish it
+
+[juxtacrop.earth](https://juxtacrop.earth/) is deployed by Vercel on every push to `main`. `vercel.json` tells it to run the checks in `web/` and publish the `web/` folder (no install step, no framework).
+
+Any other static host works too (Netlify, Cloudflare Pages, GitHub Pages…): publish `web/` as is. All links are relative, so it also works under a sub-path such as `user.github.io/juxtacrop/`; `web/.nojekyll` keeps GitHub Pages from filtering files.
 
 ## Flow
 
 1. **Location** – search (OpenStreetMap Nominatim), coordinates or GPS. All NASA/FAO data load for that point.
-2. **Field** – outline the boundary on Esri / **Sentinel-2** / **Landsat** imagery. SRTM elevation is sampled on a 10×10 grid → slope and low spots.
+2. **Field** – outline the boundary on Esri imagery. Elevation (Copernicus DEM) is sampled on a 10×10 grid → slope and low spots.
 3. **Plots** – draw management units or split automatically; each gets its own slope.
-4. **History** – crops of the last 6 seasons (3 summers + 3 winters) and drainage → the *current rotation*.
+4. **History** – crops of the last 6 seasons (3 summers + 3 winters) and drainage → the *current rotation*. Seasons left as “I don’t know” are reconstructed from satellite history (simulated in this prototype) and flagged as estimates.
 5. **Priorities & constraints** – soil organic matter, water, erosion, nitrogen, pest cycles, income/forage; irrigation, equipment, livestock.
 6. **Compare** – current rotation vs. 3 generated strategies + an editable *My plan* (drag crops from the catalog). Optional *what-if* sliders shift rainfall and temperature (clearly labelled as hypotheses).
 
@@ -38,9 +44,7 @@ python server.py
 | **NASA GPM IMERG** | POWER daily API (`IMERG_PRECTOT`, 2001→) | Monthly rain climatology, last-12-month anomaly, heavy-rain days (≥ 50 mm), rain trend → **rain on bare soil**, rain vs. crop water use, waterlogging risk |
 | **NASA SMAP L4** root-zone soil moisture | GIBS tiles, value decoded from the official color map, 15th of every month since 2015 | Typical driest months, drought-prone months, recent anomaly → water-risk evidence, cover-crop water-use warnings; map overlay |
 | **NASA MODIS NDVI** (monthly) | GIBS tiles, decoded, last 10 years | Months when the land is typically bare (NDVI < 0.4) → evidence for cover crops; map overlay |
-| **NASA/USGS Landsat** | GIBS WELD annual composites (1983–2000) + least-cloudy Landsat 8/9 scene per season (Esri Living Atlas, 2013→) | Visual history of the field |
-| **Sentinel-2** cloudless 2023 (EOX) | WMTS tiles | 10 m imagery to recognise and outline the field |
-| **NASA SRTM** 30 m | OpenTopoData via `server.py` | Slope per plot, low spots → RUSLE slope factor for **erosion exposure**, waterlogging risk; slope overlay |
+| **Copernicus DEM** GLO-90 | Open-Meteo elevation API (CORS-enabled, no key) | Slope per plot, low spots → RUSLE slope factor for **erosion exposure**, waterlogging risk; slope overlay |
 | **FAO GAEZ v4** | GAEZ ImageServer `identify` per crop | Suitability index (rainfed, high input) 1981–2010 and 2041–2070 (RCP 4.5 ensemble) → filters candidate crops, flags declining suitability |
 | Agronomic literature (SARE, FAO, extension) | `js/data.js` | Qualitative crop traits: water use, rooting depth, N fixation, residue, cover, tolerances, pest host group |
 | Farmer | UI | Field, plots, history, drainage, priorities, constraints |
@@ -49,7 +53,7 @@ python server.py
 
 1. **Conditions** – raw data → monthly climate, frost/heat/heavy-rain days, soil-moisture and greenness climatologies, trends, and a sowing calendar (summer crops when mean temperature ≥ 15 °C and < 1 frost day; winter crops when it drops ≤ 16 °C; hard winters if the coldest month < −2 °C).
 2. **Schedule** – a 3-year rotation (6 seasons) is placed on a 36-month calendar: sowing windows, growth length counted in months above each crop's base temperature, winter dormancy, winter-kill of non-hardy crops, cover crops that end when the next crop is sown, perennials, late or infeasible double-crops, frost-free fit.
-3. **Indicators** – living-cover months, rain on bare soil (IMERG), erosion exposure (rain on bare soil × RUSLE slope factor from SRTM), crop water use and rain shortfall during each crop cycle, legume nitrogen, organic-matter inputs, same-host crops in a row, plant families, harvests, GAEZ suitability, plus frost/heat/waterlogging/timing/equipment risks.
+3. **Indicators** – living-cover months, rain on bare soil (IMERG), erosion exposure (rain on bare soil × RUSLE slope factor from the elevation model), crop water use and rain shortfall during each crop cycle, legume nitrogen, organic-matter inputs, same-host crops in a row, plant families, harvests, GAEZ suitability, plus frost/heat/waterlogging/timing/equipment risks.
 4. **Suggestions** – templates (current crops + cover crops, diversified 3-family rotation, water-wise rotation, perennial forage phase) are filled with crops that pass GAEZ/irrigation/equipment/season checks, repaired if infeasible, compared with the current rotation and ranked by the farmer's priority weights. Each comes with *why*, *evidence* (with source tags), *benefits*, *information gaps* and *risks to review locally*.
 
 ## Limits
@@ -58,13 +62,15 @@ python server.py
 - SMAP and MODIS values are decoded from GIBS visualisation tiles (quantised color scales), not from the science files.
 - Crop traits are typical values; indicators compare inputs and exposure, not measured soil health.
 - No soil test, market or price data are used.
+- The 90 m elevation model is coarse for small fields; slope is indicative.
+- Crop-history reconstruction from satellite imagery is simulated (mock loader and plausible crops).
 
 ## Structure
 
-- `web/` – public, scroll-driven presentation website
-- `index.html`, `css/styles.css` – interactive MVP UI (mounted at `/demo/`)
-- `js/data.js` – crop knowledge base, priorities, source catalogue
-- `js/sources.js` – live data access (POWER, IMERG, GIBS decoding, GAEZ, SRTM, Landsat)
-- `js/engine.js` – conditions, scheduling, indicators, suggestions
-- `js/app.js` – map, drawing, panels, comparison view
-- `server.py` – static server + SRTM proxy
+- `web/` – the whole static site: scroll-driven presentation website at `/`
+- `web/demo/index.html`, `web/demo/css/styles.css` – interactive MVP UI at `/demo/`
+- `web/demo/js/data.js` – crop knowledge base, priorities, source catalogue
+- `web/demo/js/sources.js` – live data access (POWER, IMERG, GIBS decoding, GAEZ, elevation)
+- `web/demo/js/engine.js` – conditions, scheduling, indicators, suggestions
+- `web/demo/js/app.js` – map, drawing, panels, comparison view
+- `server.py` – local preview server for `web/`
