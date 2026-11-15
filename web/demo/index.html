@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <script>
+    // Opened as ".../demo" (no trailing slash): relative CSS/JS would resolve against the site root.
+    if (!location.pathname.endsWith('/') && !/\.html?$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>juxtacrop · Crop rotation helper</title>
   <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
