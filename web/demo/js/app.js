@@ -38,22 +38,15 @@ const weights = () => Object.fromEntries(Object.keys(GOALS).map(k => [k, S.goals
 /* ================= MAP ================= */
 const map = L.map('map', { zoomControl: false }).setView([20, -40], 3);
 L.control.zoom({ position: 'topright' }).addTo(map);
-const BASES = {
-  esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
-  s2: L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg', {
-    maxZoom: 19, maxNativeZoom: 15, attribution: 'Sentinel-2 cloudless 2023 by EOX (Contains modified Copernicus Sentinel data 2023)' }),
-  landsat: null,
-};
-const BASE_MAXZOOM = { esri: 19, s2: 15, landsat: 14 }; // beyond this 10–30 m pixels are just blur
-let baseLayer = BASES.esri.addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.8 }).addTo(map);
 const OVERLAYS = {};
 const LEGENDS = {
   smap: { title: 'Soil moisture in the root zone (NASA SMAP)', img: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' },
   imerg: { title: 'Rain falling now (NASA GPM IMERG)', img: 'https://gibs.earthdata.nasa.gov/legends/GPM_Precipitation_Rate_H.svg' },
   ndvi: { title: 'Plant greenness (NASA MODIS NDVI)', img: 'https://gibs.earthdata.nasa.gov/legends/MODIS_L3_NDVI_H.svg' },
-  slope: { title: 'Slope of your field (NASA SRTM)', html: '<div class="slope-legend"><span style="--c:#4F8A3C">flat</span><span style="--c:#C7C23B">gentle</span><span style="--c:#E08A2B">moderate</span><span style="--c:#B5523B">steep</span><span>💧 low spot</span></div>' },
+  slope: { title: 'Slope of your field (Copernicus DEM)', html: '<div class="slope-legend"><span style="--c:#4F8A3C">flat</span><span style="--c:#C7C23B">gentle</span><span style="--c:#E08A2B">moderate</span><span style="--c:#B5523B">steep</span><span>💧 low spot</span></div>' },
 };
 const gibsUrl = (layer, date, set, ext = 'png') => `${Sources.GIBS}/${layer}/default/${date}/${set}/{z}/{y}/{x}.${ext}`;
 const pad = n => String(n).padStart(2, '0');
@@ -82,31 +75,6 @@ function setOverlay(key, on) {
 function renderLegend() {
   const on = Object.keys(OVERLAYS).filter(k => OVERLAYS[k]);
   $('#legend').innerHTML = on.map(k => `<div class="lg"><b>${LEGENDS[k].title}</b>${LEGENDS[k].img ? `<img src="${LEGENDS[k].img}" alt="" />` : LEGENDS[k].html}</div>`).join('');
-}
-
-async function setBase(kind) {
-  map.removeLayer(baseLayer);
-  let note = '';
-  if (kind === 'landsat') {
-    const year = +$('#landsatYear').value;
-    if (Sources.WELD_YEARS.includes(year)) {
-      BASES.landsat = L.tileLayer(gibsUrl('Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual', `${year}-12-01`, 'GoogleMapsCompatible_Level12', 'jpg'), { maxNativeZoom: 12, maxZoom: 19, attribution: 'NASA Landsat WELD via GIBS' });
-      note = `Landsat ${year} (yearly average)`;
-    } else {
-      if (!S.lat) { toast('Choose a location first.'); baseLayer = BASES.esri.addTo(map); return; }
-      $('#landsatNote').textContent = `Looking for a clear Landsat photo of ${year}…`;
-      const scene = await Sources.landsatScene(year, S.lat, S.lon, S.lat < 0).catch(() => null);
-      if (!scene) { $('#landsatNote').textContent = `No clear Landsat photo for ${year} — try another year.`; baseLayer = BASES.esri.addTo(map); baseLayer.bringToBack(); map.setMaxZoom(19); return; }
-      BASES.landsat = Sources.landsatTileLayer(scene.id);
-      note = `${scene.sensor} · ${scene.date}`;
-    }
-    note += ' · 30 m pixels, zoomed out for a clear view';
-  } else if (kind === 's2') note = '10 m pixels — fields look blurry up close';
-  baseLayer = BASES[kind];
-  baseLayer.addTo(map); baseLayer.bringToBack();
-  map.setMaxZoom(BASE_MAXZOOM[kind]);
-  if (map.getZoom() > BASE_MAXZOOM[kind]) map.setZoom(BASE_MAXZOOM[kind]);
-  $('#landsatNote').textContent = note;
 }
 
 /* ================= DRAWING TOOL =================
@@ -217,7 +185,8 @@ function addParcel(gj, opts = {}) {
     feat = inter;
   }
   const id = S.nextId++;
-  const center = turf.pointOnFeature(feat).geometry.coordinates;
+  const mid = turf.centroid(feat);
+  const center = (turf.booleanPointInPolygon(mid, feat) ? mid : turf.pointOnFeature(feat)).geometry.coordinates;
   const p = {
     id, name: opts.name || `Plot ${id}`, geo: feat, areaHa: turf.area(feat) / 10000,
     history: opts.history || Array(Engine.SLOTS).fill(''), drainage: opts.drainage || 'unknown',
@@ -290,7 +259,7 @@ function selectParcel(id) {
 }
 map.on('zoomend', () => map.getContainer().classList.toggle('z-low', map.getZoom() < 14));
 
-/* ================= TERRAIN (SRTM) ================= */
+/* ================= TERRAIN (elevation model) ================= */
 async function loadTerrain() {
   if (!S.field) return;
   const field = S.field;
@@ -373,7 +342,6 @@ function setLocation(lat, lon, name, zoom = 15) {
   $('#onboard').classList.add('hidden');
   $('#searchResults').innerHTML = '';
   map.flyTo([lat, lon], Math.min(zoom, map.getMaxZoom()), { duration: 1.2 });
-  fillLandsatYears();
   if (moved) loadData();
   updateUI();
 }
@@ -417,22 +385,28 @@ const DEMOS = {
     ],
   },
   uruguay: {
-    lat: -32.745, lon: -57.700, name: 'Sample farm · Río Negro, Uruguay (fictional)', d: 0.0055, e: 0.0075,
+    // Real paddocks: boundaries traced along the roads, creek and fences visible on Esri World Imagery.
+    // The farm is the union of the paddocks. Crops and history are fictional.
+    lat: -32.7495, lon: -57.7087, name: 'Sample farm · Río Negro, Uruguay (fictional)', zoom: 16,
     plots: [
-      { name: 'North plot', drainage: 'good', history: ['soybean', 'wheat', 'soybean', 'fallow', 'soybean', 'wheat'] },
-      { name: 'Lowland plot', drainage: 'limited', history: ['soybean', 'fallow', 'soybean', 'fallow', 'soybean', 'fallow'] },
-      { name: 'Mill plot', drainage: 'good', history: ['corn', 'oats', 'soybean', 'wheat', 'sunflower', 'fallow'] },
+      { name: 'North paddock', drainage: 'good', history: ['soybean', 'wheat', 'soybean', 'fallow', 'soybean', 'wheat'],
+        ring: [[-57.714186,-32.746136],[-57.709132,-32.745991],[-57.708467,-32.746821],[-57.707984,-32.747832],[-57.707748,-32.748581],[-57.707148,-32.749348],[-57.706536,-32.750205],[-57.706053,-32.751333],[-57.705967,-32.752326],[-57.714261,-32.746298],[-57.714186,-32.746136]] },
+      { name: 'West paddock', drainage: 'limited', history: ['soybean', 'fallow', 'soybean', 'fallow', 'soybean', 'fallow'],
+        ring: [[-57.714497,-32.746479],[-57.714658,-32.7472],[-57.715366,-32.750025],[-57.715151,-32.750575],[-57.713435,-32.75118],[-57.71086,-32.751063],[-57.709433,-32.750684],[-57.709057,-32.750431],[-57.714497,-32.746479]] },
+      { name: 'East paddock', drainage: 'good', history: ['corn', 'oats', 'soybean', 'wheat', 'sunflower', 'fallow'],
+        ring: [[-57.707577,-32.746172],[-57.707169,-32.745937],[-57.705678,-32.745847],[-57.704283,-32.746145],[-57.702566,-32.74684],[-57.702105,-32.748085],[-57.702105,-32.750386],[-57.702427,-32.751378],[-57.703103,-32.75293],[-57.704873,-32.753192],[-57.705356,-32.75219],[-57.705731,-32.751423],[-57.706214,-32.750521],[-57.707019,-32.749303],[-57.707641,-32.748536],[-57.707684,-32.747092],[-57.707577,-32.746172]] },
     ],
   },
 };
 function loadDemo(key) {
   const D = DEMOS[key];
-  setLocation(D.lat, D.lon, D.name, 15);
+  setLocation(D.lat, D.lon, D.name, D.zoom || 15);
   const { lat, lon, d, e } = D;
-  const field = turf.polygon([[[lon - e, lat + d], [lon + e * 0.95, lat + d * 1.03], [lon + e, lat - d * 0.95], [lon - e * 1.02, lat - d], [lon - e, lat + d]]]);
+  const field = D.plots[0].ring ? D.plots.slice(1).reduce((u, pl) => turf.union(u, turf.polygon([pl.ring])), turf.polygon([D.plots[0].ring])) : turf.polygon([[[lon - e, lat + d], [lon + e * 0.95, lat + d * 1.03], [lon + e, lat - d * 0.95], [lon - e * 1.02, lat - d], [lon - e, lat + d]]]);
   setTimeout(() => {
     setField(field);
-    autoSplit(D.plots.length);
+    if (D.plots[0].ring) { D.plots.forEach(pl => addParcel(turf.polygon([pl.ring]))); assignTerrain(); }
+    else autoSplit(D.plots.length);
     S.parcels.forEach((p, i) => { Object.assign(p, { name: D.plots[i].name, drainage: D.plots[i].drainage, history: D.plots[i].history.slice() }); refreshParcel(p); });
     selectParcel(S.parcels[0].id);
     $('#paneField').classList.add('min'); $('#paneField .pane-min').textContent = '+';
@@ -596,8 +570,9 @@ function evidence(s, base, c, p) {
     const cr = CROP_BY_ID[id], g = cr.gaez ? c.gaez[cr.gaez] : null;
     if (g && g.now != null) add(ev, `${cr.name}: FAO GAEZ suitability ${Math.round(g.now / 100)}/100${g.future != null ? ` → ${Math.round(g.future / 100)} in 2041–2070` : ''}.`, ['gaez']);
   });
+  if (p.estimated?.length) add(ev, `${p.estimated.length} past season(s) reconstructed from the Landsat / Sentinel-2 archive (simulated in this prototype) — treat them as estimates.`, ['modis']);
   if (p.history.some(h => !h)) add(gaps, `${p.history.filter(h => !h).length} season(s) of history unknown — treated as bare.`, ['farmer']);
-  if (p.drainage === 'unknown') add(gaps, 'Drainage not entered — waterlogging estimated from SRTM low spots only.', ['farmer']);
+  if (p.drainage === 'unknown') add(gaps, 'Drainage not entered — waterlogging estimated from elevation-model low spots only.', ['farmer']);
   add(gaps, 'No soil test: the comparison is about soil cover and inputs, not measured soil health.', ['farmer']);
   add(gaps, 'Rain, temperature and soil moisture describe the area (11–50 km), not this exact plot.', ['imerg', 'power', 'smap']);
   ind.crops.filter(cr => !cr.gaez).forEach(cr => add(gaps, `${cr.name} is not assessed by FAO GAEZ.`, ['gaez']));
@@ -671,15 +646,14 @@ function renderRank() {
   const lab = seasons(true)[k], hero = heroOf(plan);
   const rows = rankCrops(plan, hero.slots, k);
   el.innerHTML = `<div class="rk-for">${seasonIcon(k)} <b>${lab.long}</b>${S.sel?.when === 'future' ? '' : '<span class="muted xs"> · next</span>'}</div>
-    <div class="rk-list">${rows.map(r => `<div class="rk ${r.id === hero.slots[k] ? 'in' : ''}" draggable="true" data-id="${r.id}" style="--c:${r.c.color}" title="${esc(r.why)} — tap to plant it in ${lab.long}, or drag it onto a season">
+    <div class="rk-list">${rows.map(r => `<div class="rk ${r.id === hero.slots[k] ? 'in' : ''}" data-id="${r.id}" style="--c:${r.c.color}" title="${esc(r.why)} — tap to plant it in ${lab.long}, or drag it onto a season">
       <span class="rk-e">${r.c.emoji}</span>
       <span class="rk-n">${esc(cropName(r.id))}${S.want.has(r.id) ? ' <em>★</em>' : ''}</span>
       <b>${r.id === hero.slots[k] ? '✓ ' : ''}${r.score}%</b><i style="width:${r.score}%"></i></div>`).join('') || '<p class="muted xs">No crop fits this season here.</p>'}</div>
-    <p class="muted xs rk-note" title="% = how much the crop helps this season for your goals + FAO GAEZ climate fit">Tap or drag a crop onto a season ⓘ</p>`;
+    <p class="muted xs rk-note" title="% = how much the crop helps this season for your goals + FAO GAEZ climate fit">Tap, or drag a crop onto a season or a plot ⓘ</p>`;
   $$('.rk', el).forEach(r => {
-    r.onclick = () => setSlot(k, r.dataset.id);
-    r.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', r.dataset.id); e.dataTransfer.effectAllowed = 'copy'; document.body.classList.add('is-dragging'); });
-    r.addEventListener('dragend', () => document.body.classList.remove('is-dragging'));
+    r.onclick = () => { if (!Drag.on) setSlot(k, r.dataset.id); };
+    r.addEventListener('pointerdown', e => startCropDrag(e, r.dataset.id, k));
   });
 }
 function setSlot(k, id) {
@@ -819,7 +793,7 @@ function renderInput() {
 }
 
 /* ================= RIGHT · WEATHER (what-if sliders by period) ================= */
-const STATUS_LABEL = { power: 'POWER climate', imerg: 'IMERG rain', smap: 'SMAP moisture', ndvi: 'MODIS NDVI', gaez: 'FAO GAEZ', srtm: 'SRTM terrain' };
+const STATUS_LABEL = { power: 'POWER climate', imerg: 'IMERG rain', smap: 'SMAP moisture', ndvi: 'MODIS NDVI', gaez: 'FAO GAEZ', srtm: 'Terrain (DEM)' };
 function renderStatus() {
   if (!S.lat) { $('#loadStatus').innerHTML = ''; return; }
   $('#loadStatus').innerHTML = Object.keys(STATUS_LABEL).map(k => {
@@ -993,8 +967,8 @@ function renderConditions() {
   if (S.terrain) html += `<section class="card"><div class="block-head"><h3>Terrain</h3><button class="link" id="showSlope">show on map</button></div>
       <ul class="facts"><li><span>Mean slope</span><b>${fmt(S.terrain.slopeMean, 1)} % (max ${fmt(S.terrain.slopeMax, 1)} %)</b></li><li><span>Relief</span><b>${fmt(S.terrain.relief)} m</b></li>
       ${S.parcels.filter(p => p.terrain).map(p => `<li><span>${esc(p.name)}</span><b>${fmt(p.terrain.slopeMean, 1)} % · ${Math.round(p.terrain.lowShare * 100)} % low spots</b></li>`).join('')}</ul>
-      <div class="card-foot">${srcChip('srtm')}<span>30 m · ${S.terrain.inside.length} samples</span></div></section>`;
-  else if (S.field && S.status.srtm === 'error') html += `<section class="card"><p class="muted xs">SRTM elevation unavailable — start the app with <code>python server.py</code>.</p></section>`;
+      <div class="card-foot">${srcChip('srtm')}<span>90 m · ${S.terrain.inside.length} samples</span></div></section>`;
+  else if (S.field && S.status.srtm === 'error') html += `<section class="card"><p class="muted xs">Elevation data unavailable right now (offline?). Slope and low spots are left out.</p></section>`;
   const g = c.gaez || {};
   const rows = CROPS.filter(cr => cr.gaez && g[cr.gaez] && g[cr.gaez].now != null).sort((a, b) => g[b.gaez].now - g[a.gaez].now);
   if (rows.length) html += `<section class="card"><div class="block-head"><h3>Crop suitability</h3><span class="muted xs">now → 2041–2070</span></div>
@@ -1015,7 +989,8 @@ function renderRotBar() {
     const c = CROP_BY_ID[id];
     const sel = S.sel && S.sel.when === when && S.sel.k === k;
     const chg = when === 'future' && hero && hero.key !== 'current' && id !== plan.now.slots[k];
-    return `<button class="rc-c ${when} ${Engine.slotType(k)} ${sel ? 'sel' : ''} ${chg ? 'chg' : ''}" data-when="${when}" data-k="${k}" title="${lab.long}: ${esc(slotName(id))}${chg ? ' (change)' : ''}">
+    const est = when === 'past' && p && isEstimated(p, k);
+    return `<button class="rc-c ${when} ${Engine.slotType(k)} ${sel ? 'sel' : ''} ${chg ? 'chg' : ''} ${est ? 'est' : ''}" data-when="${when}" data-k="${k}" title="${lab.long}: ${esc(slotName(id))}${chg ? ' (change)' : ''}${est ? ' · estimated from satellite images' : ''}">
       <i class="${c ? '' : id === 'fallow' ? 'bare' : 'unk'}" style="${c ? `--c:${c.color}` : ''}">${c ? c.emoji : id === 'fallow' ? '' : '?'}</i><small>${lab.short}</small></button>`;
   };
   const pastSlots = p ? p.history : Array(6).fill('');
@@ -1040,11 +1015,6 @@ function renderRotBar() {
       S.wxPeriod = null;
       updateUI();
     };
-    if (b.dataset.when === 'future') {
-      b.addEventListener('dragover', e => { e.preventDefault(); b.classList.add('over'); });
-      b.addEventListener('dragleave', () => b.classList.remove('over'));
-      b.addEventListener('drop', e => { e.preventDefault(); b.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); if (CROP_BY_ID[id]) setSlot(+b.dataset.k, id); });
-    }
   });
   markLive();
 }
@@ -1113,8 +1083,10 @@ function openHistory(id) {
   $('#hRows').innerHTML = labels.map((s, k) => ({ s, k })).reverse().map(({ s, k }) => `
     <label class="h-row ${Engine.slotType(k)}"><span class="h-season"><i></i>${s}</span><select data-k="${k}">${cropOptions(k)}</select></label>`).join('');
   $$('#hRows select').forEach(sel => {
-    sel.value = p.history[+sel.dataset.k] || '';
-    sel.onchange = () => { p.history[+sel.dataset.k] = sel.value; delete S.custom[p.id]; refreshParcel(p); renderHistoryPreview(p); updateUI(); };
+    const k = +sel.dataset.k;
+    sel.value = p.history[k] || '';
+    sel.closest('.h-row').classList.toggle('est', isEstimated(p, k));
+    sel.onchange = () => { p.history[k] = sel.value; unmarkEstimated(p, k); sel.closest('.h-row').classList.remove('est'); delete S.custom[p.id]; refreshParcel(p); renderHistoryPreview(p); updateUI(); };
   });
   renderHistoryPreview(p);
   $('#historyModal').classList.remove('hidden');
@@ -1128,12 +1100,127 @@ function renderHistoryPreview(p) {
   $('#hPreview').innerHTML = `<div class="h-prev-head">Your rotation</div>${rotationStrip(p.history)}${txt}`;
 }
 
+/* ================= SATELLITE RECONSTRUCTION (simulated) =================
+   In the real product, seasons the farmer can't remember are classified from the
+   Landsat / Sentinel-2 archive (NDVI phenology per plot). Here it is mocked: a short
+   staged loader, then plausible crops filled in and flagged as estimates. */
+const isEstimated = (p, k) => !!p.estimated?.includes(k);
+const unmarkEstimated = (p, k) => { if (p.estimated) p.estimated = p.estimated.filter(x => x !== k); };
+const RECON_STEPS = [
+  { t: 'Fetching the satellite archive', d: n => `Landsat 8/9 + Sentinel-2 · ${n} scenes since ${TODAY.getFullYear() - 3}` },
+  { t: 'Removing clouds and shadows', d: () => 'Cloud mask per pixel · clear views only' },
+  { t: 'Building the greenness curve of each plot', d: () => 'NDVI time series · 10–30 m' },
+  { t: 'Matching curves to crop signatures', d: () => 'Sowing, peak and harvest dates' },
+  { t: 'Reconstructing soil state', d: () => 'Bare-soil periods and residue cover' },
+];
+function guessSlot(p, k, h) {
+  const seed = (p.id * 7 + k * 3 + Math.round(Math.abs(S.lat || 0) * 10)) % 7;
+  if (Engine.slotType(k) === 'warm') {
+    const near = h[k - 2] || h[k + 2];
+    return near === 'soybean' ? 'corn' : near === 'corn' ? 'soybean' : seed % 3 ? 'soybean' : 'corn';
+  }
+  const opts = (S.lat ?? 0) < 0 ? ['wheat', 'fallow', 'oats', 'wheat', 'barley', 'fallow', 'oats'] : ['fallow', 'rye', 'fallow', 'wheat', 'fallow', 'rye', 'fallow'];
+  return opts[seed];
+}
+function reconstructHistory() {
+  const plots = S.parcels.filter(p => p.history.some(h => !h));
+  $('#historyModal').classList.add('hidden');
+  if (!plots.length) return;
+  const labels = seasonLabels();
+  const gaps = plots.flatMap(p => p.history.map((h, k) => (h ? null : { p, k })).filter(Boolean));
+  const scenes = 96 + gaps.length * 11 + Math.round(Math.abs(S.lon || 0)) % 17;
+  const tiles = gaps.slice(0, 12).map(({ p, k }, i) => `<div class="rc-tile" style="--d:${i}"><i></i><span>${seasonIcon(k)}</span><small>${esc(p.name)}<br>${labels[k]}</small></div>`).join('');
+  $('#reconBody').innerHTML = `
+    <div class="rc-sat"><span class="rc-orbit"></span><span class="rc-icon">🛰️</span></div>
+    <h2>Reconstructing your field's history</h2>
+    <p class="muted xs">${gaps.length} season${gaps.length === 1 ? '' : 's'} you didn't remember across ${plots.length} plot${plots.length === 1 ? '' : 's'} · estimated from satellite images</p>
+    <div class="rc-tiles">${tiles}</div>
+    <ol class="rc-steps">${RECON_STEPS.map((s, i) => `<li data-i="${i}"><span class="rc-dot"></span><div><b>${s.t}</b><small>${s.d(scenes)}</small></div></li>`).join('')}</ol>
+    <div class="rc-bar"><i id="reconBar"></i></div>
+    <p class="muted xs rc-note">Simulated in this prototype — no real images are processed.</p>`;
+  $('#reconModal').classList.remove('hidden');
+  const steps = $$('#reconBody .rc-steps li'), dur = 4600, t0 = performance.now();
+  const tick = now => {
+    const f = Math.min(1, (now - t0) / dur), cur = Math.min(steps.length - 1, Math.floor(f * steps.length));
+    $('#reconBar').style.width = `${(f * 100).toFixed(1)}%`;
+    steps.forEach((li, i) => { li.classList.toggle('done', i < cur || f === 1); li.classList.toggle('on', i === cur && f < 1); });
+    $$('#reconBody .rc-tile').forEach((el, i, all) => el.classList.toggle('lit', f > 0.25 + 0.7 * i / all.length));
+    if (f < 1) return requestAnimationFrame(tick);
+    gaps.forEach(({ p, k }) => { p.history[k] = guessSlot(p, k, p.history); p.estimated = [...new Set([...(p.estimated || []), k])]; delete S.custom[p.id]; });
+    setTimeout(() => {
+      $('#reconModal').classList.add('hidden');
+      S.parcels.forEach(refreshParcel); if (S.parcels.some(p => p.id === S.historyFor)) selectParcel(S.historyFor); else updateUI();
+      toast(`🛰️ ${gaps.length} season${gaps.length === 1 ? '' : 's'} reconstructed from satellite history — marked as estimates.`);
+    }, 450);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* ================= DRAG CROPS (pointer-based: mouse, pen and touch) =================
+   Drop a ranked crop on a future season circle, or on a plot on the map. */
+const Drag = { on: false, hover: null };
+function parcelAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el || !el.closest('#map') || el.closest('.leaflet-control')) return null;
+  const r = map.getContainer().getBoundingClientRect(), ll = map.containerPointToLatLng([x - r.left, y - r.top]);
+  return S.parcels.find(p => turf.booleanPointInPolygon(turf.point([ll.lng, ll.lat]), p.geo)) || null;
+}
+function dropTarget(x, y) {
+  const el = document.elementFromPoint(x, y), c = el?.closest('.rc-c.future');
+  if (c) return { kind: 'season', el: c, k: +c.dataset.k };
+  const p = parcelAt(x, y);
+  return p ? { kind: 'plot', p } : null;
+}
+function setDragHover(t) {
+  const old = Drag.hover;
+  if (old?.el === t?.el && old?.p === t?.p) return;
+  if (old?.el) old.el.classList.remove('over');
+  if (old?.p) refreshParcel(old.p);
+  if (t?.el) t.el.classList.add('over');
+  if (t?.p) t.p.layer.setStyle({ color: '#FFFFFF', weight: 5, fillColor: '#E9F5C9', fillOpacity: 0.5 });
+  Drag.hover = t;
+}
+function startCropDrag(e, id, k) {
+  if (e.button !== 0 || !CROP_BY_ID[id]) return;
+  const src = e.currentTarget, x0 = e.clientX, y0 = e.clientY, cr = CROP_BY_ID[id];
+  let ghost = null;
+  const move = ev => {
+    if (!ghost) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      ghost = document.createElement('div');
+      ghost.className = 'drag-ghost';
+      ghost.style.setProperty('--c', cr.color);
+      ghost.innerHTML = `<span>${cr.emoji}</span>${esc(cropName(id))}`;
+      document.body.append(ghost);
+      document.body.classList.add('is-dragging'); src.classList.add('dragging'); Drag.on = true;
+    }
+    ghost.style.transform = `translate(${ev.clientX}px, ${ev.clientY}px)`;
+    const t = dropTarget(ev.clientX, ev.clientY);
+    ghost.classList.toggle('ok', !!t);
+    setDragHover(t);
+  };
+  const end = ev => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end);
+    if (!ghost) return;
+    const t = ev.type === 'pointerup' ? dropTarget(ev.clientX, ev.clientY) : null;
+    setDragHover(null);
+    ghost.remove(); document.body.classList.remove('is-dragging'); src.classList.remove('dragging');
+    setTimeout(() => { Drag.on = false; }, 0); // swallow the click that follows a drag
+    if (!t) return;
+    if (t.kind === 'season') return setSlot(t.k, id);
+    if (t.p.id !== targetPlot()?.id) selectParcel(t.p.id);
+    if (!S.plan) return toast(`Add what was planted in ${esc(t.p.name)} first.`);
+    setSlot(k, id);
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', end); addEventListener('pointercancel', end);
+}
+
 /* ================= SOURCES MODAL ================= */
 function renderSources() {
   $('#sourcesBody').innerHTML = Object.entries(SOURCES).map(([k, s]) => `
     <div class="srow"><div class="s-name">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}<small>${s.scale}</small></div>
       <div><p>${s.what}</p><p class="muted xs">⚠ ${s.limit}</p></div></div>`).join('')
-    + `<p class="muted xs">Live access: NASA POWER API (climate + IMERG), NASA GIBS map tiles (SMAP, MODIS NDVI, Landsat WELD — data values decoded from the published color maps), Esri Living Atlas Landsat 8/9 image service, FAO GAEZ v4 image services, OpenTopoData SRTM (via the local server). Sentinel-2 cloudless © EOX, CC BY-NC-SA 4.0.</p>`;
+    + `<p class="muted xs">Live access: NASA POWER API (climate + IMERG), NASA GIBS map tiles (SMAP, MODIS NDVI — data values decoded from the published color maps), FAO GAEZ v4 image services, Open-Meteo elevation API (Copernicus DEM GLO-90). Crop-history reconstruction from the Landsat/Sentinel-2 archive is simulated in this prototype.</p>`;
 }
 
 /* ================= GLOBAL ================= */
@@ -1144,14 +1231,6 @@ function updateUI() {
   renderPlotList(); renderInput(); renderRank(); renderRotBar(); renderSeasonPop(); renderWeather(); renderTimeLabel();
   S.parcels.forEach(refreshParcel);
   autoHint();
-}
-function fillLandsatYears() {
-  const sel = $('#landsatYear'), cur = sel.value;
-  const last = TODAY.getFullYear() - (TODAY.getMonth() < 3 ? 1 : 0);
-  const years = [...Sources.WELD_YEARS];
-  for (let y = Sources.firstL8Year; y <= last; y++) years.push(y);
-  sel.innerHTML = years.reverse().map(y => `<option>${y}</option>`).join('');
-  if (cur) sel.value = cur;
 }
 let toastT;
 function toast(msg) { const t = $('#toast'); t.innerHTML = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
@@ -1176,8 +1255,6 @@ $('#drawParcelBtn').onclick = () => startDraw('parcel');
 $('#splitBtn').onclick = () => { cancelDraw(true); autoSplit(+$('#splitN').value); };
 $('#clearBtn').onclick = () => { cancelDraw(true); clearAll(); toast('Field and plots cleared.'); };
 
-$$('input[name="base"]').forEach(r => r.onchange = () => setBase(r.value));
-$('#landsatYear').onchange = () => { $('input[name="base"][value="landsat"]').checked = true; setBase('landsat'); };
 $$('[data-ov]').forEach(cb => cb.onchange = () => setOverlay(cb.dataset.ov, cb.checked));
 
 $('#simBtn').onclick = toggleSim;
@@ -1187,9 +1264,10 @@ window.addEventListener('resize', () => renderSeasonPop());
 
 $$('[data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.add('hidden'));
 ['historyModal', 'sourcesModal', 'whyModal', 'dataModal', 'planModal'].forEach(id => $('#' + id).addEventListener('click', e => { if (e.target.id === id) e.target.classList.add('hidden'); }));
+$('#hDone').onclick = reconstructHistory;
 $('#hCopyAll').onclick = () => {
   const src = S.parcels.find(x => x.id === S.historyFor); if (!src) return;
-  S.parcels.forEach(p => { p.history = src.history.slice(); delete S.custom[p.id]; refreshParcel(p); });
+  S.parcels.forEach(p => { p.history = src.history.slice(); p.estimated = (src.estimated || []).slice(); delete S.custom[p.id]; refreshParcel(p); });
   updateUI(); toast('Same history copied to all plots.');
 };
 document.addEventListener('keydown', e => {
@@ -1199,11 +1277,10 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); finishDraw(); return; }
     if (e.key === 'Backspace' || (e.key === 'z' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); undoDraw(); return; }
   }
-  if (e.key === 'Escape') $$('.modal').forEach(m => { if (m.id !== 'onboard' || S.lat) m.classList.add('hidden'); });
+  if (e.key === 'Escape') $$('.modal').forEach(m => { if ((m.id !== 'onboard' || S.lat) && m.id !== 'reconModal') m.classList.add('hidden'); });
 });
 
 renderStatus();
-fillLandsatYears();
 updateUI();
 setTimeout(() => $('#searchInput').focus(), 200);
 if (location.hash === '#demo' || location.hash === '#iowa') loadDemo('iowa');

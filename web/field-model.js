@@ -6,14 +6,15 @@ export const CROPS={
   wheat:{name:'Wheat',color:'#e0c486',ink:'#7b6035',icon:'wheat'},
   oats:{name:'Black oat cover',color:'#6f9a63',ink:'#2d4d2c',icon:'wheat'},
 };
-// Paddocks traced on the Río Negro basemap (1200 × 780 map units). Boundaries are illustrative.
+// Real paddocks on the Río Negro basemap (1200 × 780 map units), traced along the roads, creek and
+// fences visible in the imagery; the same geometry as the demo's sample farm. Crops are illustrative.
 export const PARCELS=[
-  {id:'north',name:'North',points:'301,249 472,238 514,284 524,318 549,361 580,416 590,439 587,463',center:[452,305],initial:'soy'},
-  {id:'west',name:'West',points:'295,256 282,260 256,376 264,398 324,423 368,421 415,418 467,402 470,384',center:[338,362],initial:'soy'},
-  {id:'east',name:'East',points:'530,214 544,205 598,200 648,214 706,242 724,295 724,353 722,408 687,495 676,501 625,507 600,447 590,423 549,350 527,316 527,248',center:[640,352],initial:'corn'},
+  {id:'north',name:'North',points:'299,212 476,206 499,241 516,283 525,314 546,346 567,382 584,429 587,470 296,219',center:[468,262],initial:'soy'},
+  {id:'west',name:'West',points:'288,226 282,256 257,374 265,397 325,423 415,418 465,402 479,391',center:[352,372],initial:'soy'},
+  {id:'east',name:'East',points:'531,214 545,204 597,200 646,212 707,241 723,293 723,389 711,431 688,496 626,507 609,465 595,433 578,395 550,344 528,312 527,252',center:[632,336],initial:'corn'},
 ];
 // The farm outline drawn before the paddocks.
-export const BOUNDARY='M244 377 L271 256 L290 245 L544 193 L603 189 L656 205 L716 236 L736 292 L736 354 L733 412 L695 504 L684 510 L631 518 L313 427 L252 400 Z';
+export const BOUNDARY='M250 376 L276 254 L283 222 L296 205 L476 199 L597 192 L650 205 L713 236 L731 291 L731 390 L718 434 L694 503 L624 515 L583 478 L465 410 L417 426 L322 431 L258 401 Z';
 const ramp=(p,a,b)=>smooth((p-a)/(b-a));
 const flight=(crop,parcel,p,a,b)=>({crop,parcel,progress:clamp((p-a)/(b-a)),visible:p>a&&p<b});
 

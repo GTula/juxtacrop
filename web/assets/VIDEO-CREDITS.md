@@ -1,41 +1,32 @@
-# Fuentes y créditos
+# juxtacrop pitch film: credits
 
-## Imagen aérea real
+`juxtacrop-pitch.mp4` · 30 s · 1920×1080 · English voice, English captions in `juxtacrop-pitch-en.vtt`.
 
-Fuente: Infraestructura de Datos Espaciales de Uruguay (IDE Uruguay).
-Producto: Mosaico Nacional 2017–2018, capa WMS `ortofoto_nacional`.
+## Music (CC BY 4.0, attribution required)
 
-Catálogo oficial de servicios, publicados como datos abiertos:
-https://www.gub.uy/infraestructura-datos-espaciales/geoservicios-ide-uruguay
+- “Long Note Four” by Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0. https://creativecommons.org/licenses/by/4.0/
+- “Inspired” by Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0. https://creativecommons.org/licenses/by/4.0/
 
-Servicio: https://mapas.ide.uy/geoservicios/WMS/WMS_Uruguay_IDEuy_Ortofotos
+## Sound effects
 
-La respuesta GetCapabilities indica `Fees: NONE` y `AccessConstraints: NONE`. La atribución y el período del mosaico permanecen visibles en pantalla. No se afirma una fecha exacta de captura para cada píxel.
+- “Deep Cinematic Impact” by MeijstroAudio, CC BY 4.0: https://freesound.org/people/MeijstroAudio/sounds/377303
+- “Deep Whoosh #1” by Kinoton, CC0 1.0: https://freesound.org/people/Kinoton/sounds/351256
 
-Encuadre geográfico (longitud/latitud): oeste −58.129375, sur −33.509494, este −58.110625, norte −33.497498. Solicitud WMS 1.1.1, EPSG:4326, 2000×1280, JPEG.
+## Footage
 
-Se superponen límites y parcelas de demostración. No se atribuye su definición a IDE, no se afirma titularidad y no se utilizan límites catastrales.
+- Stock clips from Pexels (Pexels License: free to use, attribution not required).
 
-## Música
+## Imagery and data
 
-“Dream Culture” — Kevin MacLeod (incompetech.com).
-Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
-Fuente: https://remote.incompetech.com/music/royalty-free/index.html?Search=Search&isrc=USUAN1300046
+- Satellite descent: Esri World Imagery (Esri, Maxar, Earthstar Geographics), credited on screen.
+- App screens: the working juxtacrop prototype (`/demo/#uruguay`) with a fictional sample farm in Río Negro, Uruguay, showing NASA POWER, GPM IMERG, SMAP and MODIS NDVI data.
 
-Cambios: extracto 12–122 s, mezcla con efectos, ajuste de volumen y fundidos. Mantener la atribución al publicar el video.
+## Voice
 
-## Efectos y tipografía
+- Team juxtacrop.
 
-`click-soft.mp3` y `whoosh-short.mp3`: biblioteca local de la skill media-use, atribuida a Pixabay, bajo Pixabay Content License: https://pixabay.com/service/license-summary/
+## Typeface
 
-Outfit: Copyright 2021 The Outfit Project Authors; SIL Open Font License 1.1. Texto de licencia en `assets/Outfit-OFL.txt`.
+- Outfit: Copyright 2021 The Outfit Project Authors, SIL Open Font License 1.1 (`Outfit-OFL.txt`).
 
-GSAP: biblioteca distribuida con HyperFrames; el archivo conserva su encabezado y referencia de licencia.
-
-## Integraciones previstas
-
-- NASA IMERG: https://gpm.nasa.gov/data/imerg
-- NASA POWER: https://power.larc.nasa.gov/docs/services/api/temporal/daily/
-- Desafío: https://www.spaceappschallenge.org/2026/challenges/field-shift-adapting-farms-with-nasa-data/
-
-La demostración no descarga datos NASA ni ejecuta un modelo agronómico. Diseño y animación de interfaz originales para el concepto Campo Vivo. Sin afiliación o aval de NASA.
+Independent student project for NASA Space Apps 2026. No affiliation with or endorsement by NASA.

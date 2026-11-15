@@ -2,7 +2,7 @@ export const sources = [
   { name: 'GPM / IMERG', role: 'Rainfall context', body: 'Satellite-based precipitation estimates help put a season in historical context.', limit: 'Regional estimates, not rain measurements for each small parcel.', url: 'https://gpm.nasa.gov/data/imerg', agency: 'NASA' },
   { name: 'POWER', role: 'Climate context', body: 'Meteorological and solar data provide background for exploring growing conditions.', limit: 'Gridded observations and models, not a field-level weather forecast.', url: 'https://power.larc.nasa.gov/', agency: 'NASA' },
   { name: 'SMAP', role: 'Surface soil moisture', body: 'Surface moisture adds a regional perspective on how wet or dry conditions are.', limit: 'Surface moisture does not measure all the water available to crop roots.', url: 'https://smap.jpl.nasa.gov/', agency: 'NASA' },
-  { name: 'HLS', role: 'Vegetation over time', body: 'Harmonized Landsat and Sentinel-2 imagery can help observe changes across seasons.', limit: 'Clouds, image quality and spatial resolution still matter.', url: 'https://hls.gsfc.nasa.gov/', agency: 'NASA / USGS / ESA inputs' },
+  { name: 'MODIS NDVI', role: 'Vegetation over time', body: 'Monthly greenness shows when land in the area is usually covered or left bare.', limit: 'Resolution of 250 m to 1 km: it describes the landscape, not each paddock.', url: 'https://modis.gsfc.nasa.gov/data/dataprod/mod13.php', agency: 'NASA' },
 ];
 export const supportingSources = [
   { name: 'MGAP soil information', body: 'Soil mapping and productivity context for Uruguay. Local conditions still need confirmation.', url: 'https://www.gub.uy/ministerio-ganaderia-agricultura-pesca/' },

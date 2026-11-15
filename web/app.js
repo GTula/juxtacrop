@@ -4,7 +4,7 @@ import { initFieldMap } from './field-map.js';
 initCommon();
 const demoLink=document.createElement('a');
 demoLink.className='button small';
-demoLink.href='/demo/';
+demoLink.href='./demo/';
 demoLink.textContent='Open the demo';
 document.querySelector('.header-actions')?.prepend(demoLink);
 const sections=[...document.querySelectorAll('[data-chapter]')];

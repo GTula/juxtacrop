@@ -82,13 +82,6 @@
   <details class="layers" id="layers">
     <summary>🛰️ Map view</summary>
     <div class="layer-group">
-      <label><input type="radio" name="base" value="esri" checked /> Detailed photo</label>
-      <label><input type="radio" name="base" value="s2" /> Sentinel-2 satellite (2023)</label>
-      <label><input type="radio" name="base" value="landsat" /> Landsat — your field over the years
-        <select id="landsatYear"></select></label>
-      <span class="muted xs" id="landsatNote"></span>
-    </div>
-    <div class="layer-group">
       <span class="lg-title">Show on the map</span>
       <label><input type="checkbox" data-ov="slope" /> Slope of your field</label>
       <label><input type="checkbox" data-ov="smap" /> Soil moisture</label>
@@ -135,7 +128,7 @@
       <div class="modal-head">
         <div>
           <h2>What did you plant in <span id="hName"></span>?</h2>
-          <p class="muted xs">The last three years. Not sure? Leave it as “I don't know”.</p>
+          <p class="muted xs">The last three years. Not sure? Leave it as “I don't know” — we'll reconstruct it from satellite images.</p>
         </div>
         <button class="icon-btn" data-close>✕</button>
       </div>
@@ -147,9 +140,14 @@
       </div>
       <div class="modal-foot">
         <button class="btn ghost" id="hCopyAll">Same for all plots</button>
-        <button class="btn primary" data-close>Done</button>
+        <button class="btn primary" id="hDone">Done</button>
       </div>
     </div>
+  </div>
+
+  <!-- ========== SATELLITE RECONSTRUCTION (simulated) ========== -->
+  <div class="modal hidden" id="reconModal" aria-live="polite">
+    <div class="modal-card recon" id="reconBody"></div>
   </div>
 
   <!-- ========== ROTATION DETAILS MODAL ========== -->

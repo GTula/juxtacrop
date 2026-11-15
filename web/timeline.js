@@ -46,7 +46,7 @@ export const SHOTS=[
   pose('wet','Wetter assumptions · Illustrative layer',GROUND,[0,0,0],{field:1,rain:1,mapAngle:-2.6,mapScale:1.34,mapX:11.4,mapY:5.6}),
   pose('rotation','The same field. Another sequence.',GROUND,[0,0,0],{field:1,rotation:1,mapAngle:1.5,mapScale:1.3,mapX:11.9,mapY:6.2}),
   pose('data','Earth observations + local knowledge',GROUND,[0,0,0],{field:1,rotation:1,data:1,mapAngle:0,mapScale:1.26,mapX:11.6,mapY:6}),
-  pose('film','The interface concept',GROUND,[0,0,0],{field:0,rotation:1,retreat:1,mapScale:1.2,mapX:11,mapY:5.6}),
+  pose('film','The pitch film',GROUND,[0,0,0],{field:0,rotation:1,retreat:1,mapScale:1.2,mapX:11,mapY:5.6}),
   pose('closing','A clearer view of the next season',GROUND,[0,0,0],{field:0,rotation:1,retreat:1,mapScale:1.2,mapX:11,mapY:5.6}),
   pose('team','The people behind juxtacrop',GROUND,[0,0,0],{field:0,rotation:1,retreat:1,mapScale:1.2,mapX:11,mapY:5.6}),
 ];

@@ -24,3 +24,4 @@ body.orbit{background:var(--paper);overflow-x:clip}.world-stage{position:fixed;i
 @media(prefers-reduced-transparency:reduce){.site-header{background:#f6f7f0;backdrop-filter:none}.is-space .site-header{background:#030b13}}
 @media print{.world-stage,.chapter-nav{display:none}.chapter{min-height:0;padding:35px 24px;break-inside:avoid}.chapter-inner,.hero .chapter-inner,.data-chapter .chapter-inner{width:100%;max-width:none}.is-space,.is-space .chapter h2,.chapter h1,.is-space .chapter-copy,.is-space .chapter-kicker{color:#192c1d}.hero .chapter-kicker{color:#192c1d}.journey-begin,.hero-bottom{display:none}.chapter h1{font-size:3rem}.chapter h2{font-size:2rem}}
 .journey-content{overflow-anchor:none}
+.closing-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 26px;margin-top:6px}

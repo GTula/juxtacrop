@@ -74,6 +74,6 @@ Earth imagery: [NASA Blue Marble Next Generation](https://science.nasa.gov/earth
 
 ## Team
 
-Manuela Guedez, Ignacio Carbajal, Guillermo Tula and Tadeo Rodriguez. Software developers and students at Universidad Católica del Uruguay (UCU).
+Manuela Guedez, Ignacio Carbajal, Guillermo Tula and Tadeo Rodriguez. Computer engineering students at Universidad Católica del Uruguay (UCU).
 
 Independent student concept for NASA Space Apps 2026. No NASA endorsement.
