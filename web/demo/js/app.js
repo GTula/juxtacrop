@@ -36,7 +36,18 @@ const S = {
 const weights = () => Object.fromEntries(Object.keys(GOALS).map(k => [k, S.goals.size ? (S.goals.has(k) ? 3 : 0.5) : 1]));
 
 /* ================= MAP ================= */
-const map = L.map('map', { zoomControl: false }).setView([20, -40], 3);
+// One world only: tiles never repeat sideways, panning stops at the edges of the world, and the
+// minimum zoom keeps the world at least as wide as the screen (no copies, no grey margins).
+const WORLD = L.latLngBounds([[-85.05, -180], [85.05, 180]]);
+L.TileLayer.mergeOptions({ noWrap: true, bounds: WORLD });
+const map = L.map('map', { zoomControl: false, maxBounds: WORLD, maxBoundsViscosity: 1, worldCopyJump: false });
+const fitMinZoom = () => {
+  const { x, y } = map.getSize();
+  map.setMinZoom(Math.max(2, Math.ceil(Math.log2(Math.max(x, y * 0.6) / 256))));
+};
+fitMinZoom();
+map.setView([20, -40], Math.max(3, map.getMinZoom()));
+window.addEventListener('resize', fitMinZoom);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(map);
@@ -98,28 +109,68 @@ function startDraw(mode) {
   map.on('click', onDrawClick).on('mousemove', onDrawMove).on('dblclick', onDrawDblClick);
   setToolActive(mode === 'field' ? 'drawFieldBtn' : 'drawParcelBtn');
   hint(mode === 'field'
-    ? '<b>Outline your field:</b> click each corner. Close it by clicking the first point, double-clicking, or pressing <b>Finish</b>.'
-    : '<b>Draw a plot</b> inside the field. Close it by clicking the first point, double-clicking, or pressing <b>Finish</b>.');
+    ? '<b>Outline your field:</b> click each corner, in any order. Close it by clicking the first point, double-clicking, or pressing <b>Finish</b>.'
+    : '<b>Draw a plot</b>: click its corners, in any order. Close it by clicking the first point, double-clicking, or pressing <b>Finish</b>.');
   renderDrawBar();
+}
+/* Corners may be clicked in any order. Draw.pts keeps the click order; the outline shown and saved is
+   that order when it closes without crossing, otherwise the same corners re-threaded so no edges
+   cross (each corner inserted where it adds the shortest detour). So a concave shape clicked in order
+   stays as drawn, and corners clicked "out of order" never produce a bow-tie. Computed in pixels. */
+function segmentsCross(a, b, c, d) {
+  const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+}
+function isSimpleRing(px) {
+  const n = px.length;
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+    if (i === 0 && j === n - 1) continue; // adjacent through the closing edge
+    if (segmentsCross(px[i], px[(i + 1) % n], px[j], px[(j + 1) % n])) return false;
+  }
+  return true;
+}
+/** The corners as a non-crossing outline: click order if it closes cleanly, else re-threaded. The first corner stays first. */
+function outline(pts = Draw.pts) {
+  if (pts.length < 4) return pts.slice();
+  const px = new Map(pts.map(p => [p, map.latLngToContainerPoint(p)]));
+  const toPx = ring => ring.map(p => px.get(p));
+  if (isSimpleRing(toPx(pts))) return pts.slice();
+  const ring = pts.slice(0, 3);
+  for (const p of pts.slice(3)) {
+    const c = px.get(p), n = ring.length;
+    let best = null;
+    for (let i = 0; i < n; i++) {
+      const cand = [...ring.slice(0, i + 1), p, ...ring.slice(i + 1)];
+      if (!isSimpleRing(toPx(cand))) continue;
+      const a = px.get(ring[i]), b = px.get(ring[(i + 1) % n]);
+      const cost = a.distanceTo(c) + c.distanceTo(b) - a.distanceTo(b);
+      if (!best || cost < best.cost) best = { k: i + 1, cost };
+    }
+    ring.splice(best ? best.k : n, 0, p);
+  }
+  return ring;
 }
 function onDrawClick(e) {
   const pts = Draw.pts;
   const px = map.latLngToContainerPoint(e.latlng);
   if (pts.length >= 3 && px.distanceTo(map.latLngToContainerPoint(pts[0])) < 14) return finishDraw();
-  if (pts.length && px.distanceTo(map.latLngToContainerPoint(pts[pts.length - 1])) < 6) return;
+  if (pts.some(p => px.distanceTo(map.latLngToContainerPoint(p)) < 6)) return;
   pts.push(e.latlng);
   redrawDraft(e.latlng);
 }
 function onDrawMove(e) { if (Draw.pts.length) updateGuide(e.latlng); }
 function onDrawDblClick(e) { L.DomEvent.stop(e); finishDraw(); }
 function updateGuide(cursor) {
-  const pts = Draw.pts;
-  if (!pts.length || !cursor) { Draw.guide.setLatLngs([]); return; }
-  Draw.guide.setLatLngs(pts.length >= 2 ? [pts[pts.length - 1], cursor, pts[0]] : [pts[0], cursor]);
+  const pts = Draw.pts, n = pts.length;
+  if (!n || !cursor) { Draw.guide.setLatLngs([]); return; }
+  if (n === 1) { Draw.guide.setLatLngs([pts[0], cursor]); return; }
+  // Preview where the corner would land in the outline: from its neighbour before, through the cursor, to the one after.
+  const ring = outline([...pts, cursor]), k = ring.indexOf(cursor);
+  Draw.guide.setLatLngs([ring[(k - 1 + ring.length) % ring.length], cursor, ring[(k + 1) % ring.length]]);
 }
 function redrawDraft(cursor) {
   const pts = Draw.pts;
-  Draw.shape.setLatLngs(pts);
+  Draw.shape.setLatLngs(outline());
   Draw.vertices.clearLayers();
   pts.forEach((p, i) => L.circleMarker(p, { radius: i === 0 ? 7 : 4, color: '#fff', weight: 2, interactive: false,
     fillColor: i === 0 && pts.length >= 3 ? '#7BA568' : '#2E4A2B', fillOpacity: 1 }).addTo(Draw.vertices));
@@ -130,13 +181,47 @@ function undoDraw() { if (Draw.pts.length) { Draw.pts.pop(); redrawDraft(null); 
 function finishDraw() {
   if (!S.drawMode) return;
   if (Draw.pts.length < 3) return toast('Add at least 3 points to close the shape.');
-  const ring = Draw.pts.map(p => [p.lng, p.lat]); ring.push(ring[0]);
+  const ring = outline().map(p => [p.lng, p.lat]); ring.push(ring[0]);
   const gj = turf.polygon([ring]);
   if (turf.kinks(gj).features.length) return toast('The edges cross each other. Undo a point and try again.');
   const mode = S.drawMode;
   cancelDraw(true);
   if (mode === 'field') setField(gj);
-  else { const p = addParcel(gj); if (p) { selectParcel(p.id); assignTerrain(); } else toast('The plot must be inside the field.'); }
+  else {
+    const p = addParcel(gj);
+    if (!p) return toast('The plot must be inside the field.');
+    const changed = carveOverlaps(p);
+    selectParcel(p.id); assignTerrain();
+    if (changed) toast(`${esc(p.name)} drawn · ${changed} overlapping plot${changed === 1 ? '' : 's'} trimmed to make room.`);
+  }
+}
+/** A new plot takes its area out of any plot it overlaps, so plots never stack. Returns how many changed. */
+function carveOverlaps(p) {
+  let changed = 0;
+  S.parcels.filter(q => q !== p).forEach(q => {
+    let overlap = null;
+    try { overlap = turf.intersect(q.geo, p.geo); } catch (e) { overlap = null; }
+    if (!overlap || turf.area(overlap) < 1) return;
+    let rest = null;
+    try { rest = turf.difference(q.geo, p.geo); } catch (e) { rest = null; }
+    changed++;
+    if (!rest || turf.area(rest) < 200) { deleteParcel(q.id, true); return; }
+    setParcelGeo(q, rest);
+  });
+  return changed;
+}
+function plotCenter(feat) {
+  // A plot split in pieces (e.g. across a road) is labelled on its largest piece.
+  if (feat.geometry.type === 'MultiPolygon') feat = feat.geometry.coordinates.map(c => turf.polygon(c)).sort((a, b) => turf.area(b) - turf.area(a))[0];
+  const mid = turf.centroid(feat);
+  return (turf.booleanPointInPolygon(mid, feat) ? mid : turf.pointOnFeature(feat)).geometry.coordinates;
+}
+function setParcelGeo(q, feat) {
+  q.geo = feat; q.areaHa = turf.area(feat) / 10000; q.center = plotCenter(feat); q.terrain = null;
+  q.layer.clearLayers(); q.layer.addData(feat);
+  q.label.setLatLng([q.center[1], q.center[0]]);
+  delete S.custom[q.id];
+  refreshParcel(q);
 }
 function cancelDraw(silent = false) {
   if (!S.drawMode) return;
@@ -167,11 +252,20 @@ function renderDrawBar() {
 function setToolActive(id) { $$('#mapTools .tool').forEach(b => b.classList.toggle('active', b.id === id)); }
 
 /* ================= FIELD & PLOTS ================= */
+/** Map padding that keeps the field in the free space between the side columns and the rotation bar. */
+function fieldPadding() {
+  const r = map.getContainer().getBoundingClientRect();
+  // The panels are position:fixed, so offsetParent is always null: check the rendered box instead.
+  const side = sel => { const el = $(sel); const b = el?.getBoundingClientRect(); return b && b.width > 0 && getComputedStyle(el).display !== 'none' ? b : null; };
+  const L = side('.col.left'), R = side('.col.right'), B = side('#rotBar');
+  if (r.width < 900 || !L || !R) return { padding: [40, 40] };
+  return { paddingTopLeft: [L.right - r.left + 30, 70], paddingBottomRight: [r.right - R.left + 30, B ? r.bottom - B.top + 30 : 60] };
+}
 function setField(gj) {
   clearAll(false);
   S.field = gj;
   S.fieldLayer = L.geoJSON(gj, { style: { color: '#F7F8F4', weight: 3, dashArray: '8 6', fill: true, fillOpacity: 0.04, interactive: false } }).addTo(map);
-  map.fitBounds(S.fieldLayer.getBounds(), { padding: [60, 60] });
+  map.fitBounds(S.fieldLayer.getBounds(), fieldPadding());
   toast(`Field outlined: ${fmt(turf.area(gj) / 10000, 1)} ha. Now split it into plots.`);
   loadTerrain();
   updateUI();
@@ -185,14 +279,14 @@ function addParcel(gj, opts = {}) {
     feat = inter;
   }
   const id = S.nextId++;
-  const mid = turf.centroid(feat);
-  const center = (turf.booleanPointInPolygon(mid, feat) ? mid : turf.pointOnFeature(feat)).geometry.coordinates;
+  const center = plotCenter(feat);
   const p = {
     id, name: opts.name || `Plot ${id}`, geo: feat, areaHa: turf.area(feat) / 10000,
     history: opts.history || Array(Engine.SLOTS).fill(''), drainage: opts.drainage || 'unknown',
     terrain: null, center,
   };
   p.layer = L.geoJSON(feat, { style: () => parcelStyle(p) }).addTo(map);
+  // While drawing, plots ignore the pointer (CSS on .drawing), so every click places a corner.
   p.layer.on('click', ev => { if (S.drawMode) return; L.DomEvent.stopPropagation(ev); selectParcel(p.id); });
   p.label = L.marker([center[1], center[0]], { icon: labelIcon(p), interactive: false }).addTo(map);
   S.parcels.push(p);
@@ -236,12 +330,13 @@ function autoSplit(n) {
   updateUI();
 }
 function removeParcelLayers(p) { map.removeLayer(p.layer); map.removeLayer(p.label); }
-function deleteParcel(id) {
+function deleteParcel(id, silent = false) {
   const p = S.parcels.find(x => x.id === id); if (!p) return;
   removeParcelLayers(p);
   S.parcels = S.parcels.filter(x => x.id !== id);
+  delete S.custom[id];
   if (S.selectedId === id) S.selectedId = null;
-  S.sel = null; updateUI();
+  S.sel = null; if (!silent) updateUI();
 }
 function clearAll(full = true) {
   S.parcels.forEach(removeParcelLayers);
@@ -377,11 +472,16 @@ function recompute() {
 /* ================= DEMOS ================= */
 const DEMOS = {
   iowa: {
-    lat: 42.0110, lon: -93.5435, name: 'Sample farm · Story County, Iowa (fictional)', d: 0.0042, e: 0.0058,
+    // Real fields: boundaries traced along the roads and field edges visible on Esri World Imagery.
+    // The farm is the union of the fields. Crops and history are fictional.
+    lat: 42.0145, lon: -93.5333, name: 'Sample farm · Story County, Iowa (fictional)', zoom: 16,
     plots: [
-      { name: 'North 80', drainage: 'good', history: ['corn', 'fallow', 'soybean', 'fallow', 'corn', 'fallow'] },
-      { name: 'Creek field', drainage: 'limited', history: ['soybean', 'fallow', 'corn', 'fallow', 'soybean', 'fallow'] },
-      { name: 'Hill ground', drainage: 'good', history: ['corn', 'fallow', 'corn', 'rye', 'corn', 'fallow'] },
+      { name: 'West field', drainage: 'good', history: ['corn', 'fallow', 'soybean', 'fallow', 'corn', 'fallow'],
+        ring: [[-93.540173, 42.015791], [-93.53616, 42.015807], [-93.53616, 42.012204], [-93.539357, 42.012188], [-93.539529, 42.013065], [-93.539808, 42.01434], [-93.540173, 42.015791]] },
+      { name: 'Middle field', drainage: 'limited', history: ['soybean', 'fallow', 'corn', 'fallow', 'soybean', 'fallow'],
+        ring: [[-93.536053, 42.015823], [-93.53116, 42.015855], [-93.53116, 42.012188], [-93.536053, 42.012188], [-93.536053, 42.015823]] },
+      { name: 'East field', drainage: 'good', history: ['corn', 'fallow', 'corn', 'rye', 'corn', 'fallow'],
+        ring: [[-93.530903, 42.016907], [-93.52644, 42.016939], [-93.526397, 42.012156], [-93.530903, 42.012156], [-93.530903, 42.016907]] },
     ],
   },
   uruguay: {

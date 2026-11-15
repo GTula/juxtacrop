@@ -179,6 +179,8 @@ select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; ba
 
 /* ---------- Drawing tool ---------- */
 .leaflet-container.drawing, .leaflet-container.drawing .leaflet-interactive { cursor: crosshair !important; }
+/* While drawing, existing plots must not catch the pointer: every click goes to the map and places a corner. */
+.leaflet-container.drawing .leaflet-overlay-pane .leaflet-interactive { pointer-events: none !important; }
 .draw-bar { position: absolute; left: 50%; bottom: 100px; transform: translate(-50%, 10px); z-index: 650; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-radius: 14px;
   background: rgba(255, 255, 255, .97); box-shadow: var(--shadow-lg); white-space: nowrap; opacity: 0; pointer-events: none; transition: .2s; }
 .draw-bar.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
