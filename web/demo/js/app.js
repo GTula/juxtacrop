@@ -746,13 +746,14 @@ function renderRank() {
   const lab = seasons(true)[k], hero = heroOf(plan);
   const rows = rankCrops(plan, hero.slots, k);
   el.innerHTML = `<div class="rk-for">${seasonIcon(k)} <b>${lab.long}</b>${S.sel?.when === 'future' ? '' : '<span class="muted xs"> · next</span>'}</div>
-    <div class="rk-list">${rows.map(r => `<div class="rk ${r.id === hero.slots[k] ? 'in' : ''}" data-id="${r.id}" style="--c:${r.c.color}" title="${esc(r.why)} — tap to plant it in ${lab.long}, or drag it onto a season">
+    <div class="rk-list">${rows.map(r => `<div role="button" tabindex="0" aria-label="Plant ${esc(cropName(r.id))} in ${lab.long}" class="rk ${r.id === hero.slots[k] ? 'in' : ''}" data-id="${r.id}" style="--c:${r.c.color}" title="${esc(r.why)} — tap to plant it in ${lab.long}, or drag it onto a season">
       <span class="rk-e">${r.c.emoji}</span>
       <span class="rk-n">${esc(cropName(r.id))}${S.want.has(r.id) ? ' <em>★</em>' : ''}</span>
       <b>${r.id === hero.slots[k] ? '✓ ' : ''}${r.score}%</b><i style="width:${r.score}%"></i></div>`).join('') || '<p class="muted xs">No crop fits this season here.</p>'}</div>
     <p class="muted xs rk-note" title="% = how much the crop helps this season for your goals + FAO GAEZ climate fit">Tap, or drag a crop onto a season or a plot ⓘ</p>`;
   $$('.rk', el).forEach(r => {
     r.onclick = () => { if (!Drag.on) setSlot(k, r.dataset.id); };
+    r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSlot(k, r.dataset.id); } };
     r.addEventListener('pointerdown', e => startCropDrag(e, r.dataset.id, k));
   });
 }
@@ -764,6 +765,7 @@ function setSlot(k, id) {
   S.custom[plan.p.id] = slots; S.heroKey = 'custom'; S.sel = { when: 'future', k };
   updateUI();
   toast(`${cropName(id)} → ${seasons(true)[k].long} (My plan)`);
+  document.dispatchEvent(new CustomEvent('demo:crop-edited'));
 }
 
 /* ================= SEASON POPOVER (field shift for one season) ================= */
@@ -842,6 +844,7 @@ function openWhy(plan, hero) {
       <button class="link" id="whySources">ⓘ About the data sources</button></div>`;
   $('#whySources').onclick = () => { renderSources(); $('#sourcesModal').classList.remove('hidden'); };
   $('#whyModal').classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('demo:evidence-opened'));
 }
 
 /* ================= RIGHT · FARMER INPUT ================= */
@@ -1223,6 +1226,7 @@ function guessSlot(p, k, h) {
   return opts[seed];
 }
 function reconstructHistory() {
+  document.dispatchEvent(new CustomEvent('demo:history-confirmed'));
   const plots = S.parcels.filter(p => p.history.some(h => !h));
   $('#historyModal').classList.add('hidden');
   if (!plots.length) return;
@@ -1331,6 +1335,7 @@ function updateUI() {
   renderPlotList(); renderInput(); renderRank(); renderRotBar(); renderSeasonPop(); renderWeather(); renderTimeLabel();
   S.parcels.forEach(refreshParcel);
   autoHint();
+  document.dispatchEvent(new CustomEvent('demo:updated'));
 }
 let toastT;
 function toast(msg) { const t = $('#toast'); t.innerHTML = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }

@@ -549,6 +549,8 @@ details.layers summary::after { content: " ▾"; color: var(--muted); }
   #map { position: relative; height: 60vh; }
   .brand-pill { position: absolute; }
   .col { pointer-events: auto; }
+  .col .pane, .col .pane.grow, #paneRank:not(.min) { flex: none; }
+  .col .pane-body { overflow-y: visible; }
   .why-data { grid-template-columns: 1fr; }
 }
 
