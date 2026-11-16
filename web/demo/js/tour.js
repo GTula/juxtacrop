@@ -1,6 +1,7 @@
-/* Guided tours use the real demo state; no sample results or copied controls. */
+/* Guided tours use the real demo state; no sample results or copied controls.
+   The tour never opens by itself: the "? Guided tour" button starts it straight on the first real
+   step (the location modal, where the farmer searches a field or picks a sample farm). */
 (() => {
-  const SEEN = 'juxtacrop.tour.invitation.v1';
   const root = document.createElement('div');
   root.className = 'tour-root'; root.hidden = true;
   root.innerHTML = `${Array.from({ length: 4 }, () => '<div class="tour-shade"></div>').join('')}<div class="tour-ring"></div><section class="tour-card" role="dialog" aria-label="Guided tour" tabindex="-1"></section><span class="tour-live" role="status" aria-live="polite"></span>`;
@@ -11,47 +12,37 @@
   help.setAttribute('aria-label', 'Help / Guided tour'); $('.demo-brand').append(help);
   let active = false, mode = null, index = 0, steps = [], targets = [], returnFocus, frame;
   let historyConfirmed = false, edited = false, evidence = false, selected = false;
-  let screen = 'choice', errorSince = 0, reviewing = false;
+  let screen = 'step', errorSince = 0, reviewing = false;
   const visible = el => el && !el.closest('.hidden') && el.getBoundingClientRect().width > 0;
   const shown = selector => visible($(selector));
-  const markSeen = () => { try { localStorage.setItem(SEEN, '1'); } catch { /* Storage may be disabled. */ } };
   function hideModals() { $$('.modal').forEach(el => { if (el.id !== 'reconModal') el.classList.add('hidden'); }); }
   function expand(id) { const el = $(id); el?.classList.remove('min'); const b = el?.querySelector('.pane-min'); if (b) b.textContent = '–'; }
   function close() {
-    markSeen(); active = false; root.hidden = true; document.body.classList.remove('tour-active');
+    active = false; root.hidden = true; document.body.classList.remove('tour-active');
     if (S.drawMode) cancelDraw(true);
     (returnFocus?.isConnected && visible(returnFocus) ? returnFocus : help).focus();
   }
   function shell(label, title, text, body, foot = '') {
     card.innerHTML = `<div class="tour-kicker"><span>${label}</span><button class="tour-close" data-action="close" aria-label="Close guided tour">Close ✕</button></div><h2>${title}</h2><p>${text}</p>${body}${foot}`;
   }
+  // No intro screen: resume an unfinished tour, otherwise start on the field that is there (or on the location step).
   function open() {
     returnFocus = document.activeElement; active = true; root.hidden = false;
-    document.body.classList.add('tour-active'); screen = 'choice'; choices();
-  }
-  function choices() {
-    screen = 'choice'; targets = [];
-    shell('Welcome to juxtacrop', 'Explore your next rotation', 'Learn with a sample farm or follow the guide on your own field. You can leave at any time.', `<div class="tour-choices">${mode ? '<button class="btn primary" data-action="resume">Resume guided tour</button>' : ''}${S.field ? '<button class="btn soft" data-action="current">Guide me on this field</button>' : '<button class="btn soft" data-action="own">Set up my own field</button>'}<button class="btn soft" data-action="iowa">Learn with Iowa</button><button class="btn soft" data-action="uruguay">Learn with Uruguay</button><button class="btn ghost" data-action="close">Explore without a guide</button></div>`);
-    layout(); card.focus();
-  }
-  function choose(kind) {
-    if ((kind === 'iowa' || kind === 'uruguay') && (S.field || S.parcels.length)) {
-      screen = 'replace'; targets = [];
-      shell('Change sample farm', 'Replace the current field?', 'Your current field, plots and edits will be replaced in this session.', `<div class="tour-choices"><button class="btn primary" data-action="replace" data-kind="${kind}">Replace and start sample</button><button class="btn ghost" data-action="choices">Keep my field</button></div>`); layout(); card.focus(); return;
-    }
-    start(kind);
+    document.body.classList.add('tour-active');
+    if (mode && index < steps.length) enter(); else start(S.field ? 'current' : 'own');
   }
   function start(kind) {
-    markSeen(); hideModals(); stopSim();
+    hideModals(); stopSim();
     mode = kind; index = 0; historyConfirmed = false; edited = false; evidence = false; selected = false;
     const sample = kind === 'iowa' || kind === 'uruguay';
     if (sample) { clearAll(); loadDemo(kind); }
     steps = [];
     if (sample) steps.push({ id: 'sample', title: 'Your sample farm', text: 'These boundaries follow real fields. Crops and history are fictional. Wait for the plots to appear, then continue.', target: '#paneField', ready: () => S.parcels.length > 0 });
     else {
-      if (S.lat === null) steps.push({ id: 'location', title: 'Find your field', text: 'Search for a town or coordinates, then select a result. You can also use your location.', target: '#onboard .modal-card', enter: openOnboard, ready: () => S.lat !== null, action: true });
-      if (!S.field) steps.push({ id: 'field', title: 'Outline your field', text: 'Choose Outline field, tap each corner on the map, then use Finish. Draw a boundary with at least three corners.', target: '#map', extra: '#paneField, #drawBar', ready: () => !!S.field, action: true });
-      if (!S.parcels.length) steps.push({ id: 'plots', title: 'Create management plots', text: 'Split your field with OK, or choose Draw plot and draw inside the field. At least one plot is needed.', target: '#paneField', extra: '#map, #drawBar', ready: () => S.parcels.length > 0, action: true });
+      if (S.lat === null) steps.push({ id: 'location', title: 'Find your field', text: 'Search for a town or coordinates and select a result, use your location, or pick a sample farm (Iowa or Uruguay).', target: '#onboard .modal-card', enter: openOnboard, ready: () => S.lat !== null, action: true });
+      // A sample farm draws its field and plots by itself a moment after the location is set.
+      if (!S.field) steps.push({ id: 'field', title: 'Outline your field', text: 'Choose Outline field, tap each corner on the map, then use Finish. Draw a boundary with at least three corners.', target: '#map', extra: '#paneField, #drawBar', ready: () => !!S.field || !!S.demoLoading, action: true });
+      if (!S.parcels.length) steps.push({ id: 'plots', title: 'Create management plots', text: 'Split your field with OK, or choose Draw plot and draw inside the field. At least one plot is needed.', target: '#paneField', extra: '#map, #drawBar', ready: () => S.parcels.length > 0 || !!S.demoLoading, action: true });
     }
     steps.push(
       { id: 'overview', title: 'One field, several decisions', text: 'Select a plot to work with its history and future rotation. Farmer input describes your priorities; the rotation bar compares the options.', target: '#paneField' },
@@ -134,13 +125,9 @@
     const b = e.target.closest('[data-action]'); if (!b || b.disabled) return;
     const action = b.dataset.action;
     if (action === 'close') close();
-    else if (action === 'choices') choices();
-    else if (action === 'resume') enter();
-    else if (action === 'replace') start(b.dataset.kind);
     else if (action === 'next') { if (index === steps.length - 1) { mode = null; close(); } else { index++; enter(); } }
     else if (action === 'back') { index--; enter(true); }
     else if (action === 'retry') { errorSince = Date.now(); loadData(); refresh(); }
-    else choose(action);
   });
   help.onclick = open;
   const allowed = el => card.contains(el) || targets.some(t => t.contains(el));
@@ -171,6 +158,4 @@
   window.addEventListener('resize', schedule); document.addEventListener('scroll', schedule, true);
   // Poll only while open to pick up asynchronous modal transitions and slow-source feedback.
   setInterval(() => { if (active) refresh(); }, 500);
-  let seen = false; try { seen = !!localStorage.getItem(SEEN); } catch { /* Offer once per page if storage is unavailable. */ }
-  if (!seen) open();
 })();

@@ -503,7 +503,9 @@ function loadDemo(key) {
   setLocation(D.lat, D.lon, D.name, D.zoom || 15);
   const { lat, lon, d, e } = D;
   const field = D.plots[0].ring ? D.plots.slice(1).reduce((u, pl) => turf.union(u, turf.polygon([pl.ring])), turf.polygon([D.plots[0].ring])) : turf.polygon([[[lon - e, lat + d], [lon + e * 0.95, lat + d * 1.03], [lon + e, lat - d * 0.95], [lon - e * 1.02, lat - d], [lon - e, lat + d]]]);
+  S.demoLoading = true; // the field and plots arrive after the fly-to animation
   setTimeout(() => {
+    S.demoLoading = false;
     setField(field);
     if (D.plots[0].ring) { D.plots.forEach(pl => addParcel(turf.polygon([pl.ring]))); assignTerrain(); }
     else autoSplit(D.plots.length);
@@ -1324,7 +1326,7 @@ function renderSources() {
   $('#sourcesBody').innerHTML = Object.entries(SOURCES).map(([k, s]) => `
     <div class="srow"><div class="s-name">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name}<small>${s.scale}</small></div>
       <div><p>${s.what}</p><p class="muted xs">⚠ ${s.limit}</p></div></div>`).join('')
-    + `<p class="muted xs">Live access: NASA POWER API (climate + IMERG), NASA GIBS map tiles (SMAP, MODIS NDVI — data values decoded from the published color maps), FAO GAEZ v4 image services, Open-Meteo elevation API (Copernicus DEM GLO-90). Crop-history reconstruction from the Landsat/Sentinel-2 archive is simulated in this prototype.</p>`;
+    + `<p class="muted xs">Live access: NASA POWER API (climate + IMERG), NASA GIBS map tiles (SMAP, MODIS NDVI — data values decoded from the published color maps), FAO GAEZ v4 image services, Open-Meteo elevation API (Copernicus DEM GLO-90). Crop-history reconstruction from the Landsat/Sentinel-2 archive is simulated in this prototype.</p><p class="muted xs">Open source: <a href="https://github.com/GTula/juxtacrop-nasa" target="_blank" rel="noopener">github.com/GTula/juxtacrop-nasa ↗</a></p>`;
 }
 
 /* ================= GLOBAL ================= */

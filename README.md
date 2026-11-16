@@ -6,6 +6,8 @@ Decision-support tool that helps farmers **explore crop-rotation strategies** th
 
 Built for the NASA Space Apps Challenge 2026 — *Field Shift: Adapting Farms with NASA Data*.
 
+**Live:** [juxtacrop.earth](https://juxtacrop.earth/) · **Prototype:** [juxtacrop.earth/demo/](https://juxtacrop.earth/demo/) · **Code:** [github.com/GTula/juxtacrop-nasa](https://github.com/GTula/juxtacrop-nasa)
+
 ## Run it
 
 The whole site is static and lives in `web/`. Locally it only needs Python 3 (no packages) and an Internet connection.
